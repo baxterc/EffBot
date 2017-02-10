@@ -7,6 +7,7 @@ const username = config.username;
 
 let userInfo;
 let targetChannelId;
+var botActive = true;
 //var targetChannelId = 440882;
 
 const client = new BeamClient();
@@ -44,12 +45,34 @@ client.request('GET', 'users/current').then(response => {
 function createChatSocket(userId, channelId, endpoints, authkey) {
   const socket = new BeamSocket(endpoints).boot();
 
-  /*socket.on('ChatMessage', data => {
-    if (data.message.message[0].data.toLowerCase().startsWith('!ping')) {
-      socket.call('msg', [`@${data.user_name} PONG!`]);
-      console.log(`Ponged ${data.user_name}`);
-    }
-  });*/
+      var autoMessage = setInterval(function(){ socket.call('msg', ['Howdy Folks! I am EffBot, EffingController\'s custom chat bot! Type !help for a list of commands.']); }, (5*60*1000));
+
+      socket.on('ChatMessage', data => {
+        if (botActive === true) {
+
+          if (data.message.message[0].data.toLowerCase().startsWith('!shutdown') && (data.user_name === 'EffingController') )
+          {
+            socket.call('msg', ['Shutting the Eff down!']);
+            botActive = false;
+            console.log(botActive);
+          }
+
+          /*if (data.message.message[0].data.toLowerCase().startsWith('!ping')) {
+            socket.call('msg', [`@${data.user_name} PONG!`]);
+            console.log(`Ponged ${data.user_name}`);
+          }*/
+
+          if (data.message.message[0].data.toLowerCase().startsWith('!help')) {
+            console.log(data);
+            socket.call('whisper', [data.user_name, "Here's a list of commands: !help, !links"])
+          }
+
+          if (data.message.message[0].data.toLowerCase().startsWith('!links')) {
+            socket.call('whisper', [data.user_name, 'YOUTUBE: www.youtube.com/effingcontroller | TWITTER: @effingctrlr | PATREON: www.patreon.com/effingcontroller | STREAMJAR: streamjar.tv/tip/effingcontroller | YOU\'RE WELCOME.'])
+          }
+        }
+      })
+
 
   socket.on('error', error => {
     console.error('Socket error: ', error);
