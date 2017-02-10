@@ -7,6 +7,7 @@ const username = config.username;
 
 let userInfo;
 let targetChannelId;
+//var targetChannelId = 440882;
 
 const client = new BeamClient();
 
@@ -17,15 +18,18 @@ client.use('oauth', {
   },
 });
 
-client.request('GET', 'channels/' + username ).then(response => {
+/*client.request('GET', 'channels/' + username ).then(response => {
   targetChannelId = response.body.id;
   console.log('channelId for target chat is: ' + targetChannelId);
-})
+})*/
 
 client.request('GET', 'users/current').then(response => {
   console.log(response.body);
   userInfo = response.body;
-  return client.chat.join(targetChannelId);
+  return client.request('GET', 'channels/' + username).then(response2 => {
+    targetChannelId = response2.body.id;
+    return client.chat.join(targetChannelId);
+  })
 })
 .then(response => {
   const body = response.body;
@@ -40,13 +44,19 @@ client.request('GET', 'users/current').then(response => {
 function createChatSocket(userId, channelId, endpoints, authkey) {
   const socket = new BeamSocket(endpoints).boot();
 
-  socket.auth(channelId, userId, authkey)
-  .then(() => {
-    console.log('Authentication successful.');
-    //return socket.call('msg', ['Hello world!']);
-  });
+  /*socket.on('ChatMessage', data => {
+    if (data.message.message[0].data.toLowerCase().startsWith('!ping')) {
+      socket.call('msg', [`@${data.user_name} PONG!`]);
+      console.log(`Ponged ${data.user_name}`);
+    }
+  });*/
 
   socket.on('error', error => {
     console.error('Socket error: ', error);
+  });
+
+  return socket.auth(channelId, userId, authkey)
+  .then(() => {
+    console.log('Authentication successful.');
   });
 }
