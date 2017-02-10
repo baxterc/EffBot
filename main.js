@@ -8,7 +8,6 @@ const username = config.username;
 let userInfo;
 let targetChannelId;
 var botActive = true;
-//var targetChannelId = 440882;
 
 const client = new BeamClient();
 
@@ -18,11 +17,6 @@ client.use('oauth', {
     expires: Date.now() + (365 * 24 * 60 * 60 * 1000)
   },
 });
-
-/*client.request('GET', 'channels/' + username ).then(response => {
-  targetChannelId = response.body.id;
-  console.log('channelId for target chat is: ' + targetChannelId);
-})*/
 
 client.request('GET', 'users/current').then(response => {
   console.log(response.body);
@@ -56,11 +50,6 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
             botActive = false;
             console.log(botActive);
           }
-
-          /*if (data.message.message[0].data.toLowerCase().startsWith('!ping')) {
-            socket.call('msg', [`@${data.user_name} PONG!`]);
-            console.log(`Ponged ${data.user_name}`);
-          }*/
 
           if (data.message.message[0].data.toLowerCase().startsWith('!help')) {
             console.log(data);
