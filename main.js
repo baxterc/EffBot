@@ -1,6 +1,9 @@
 const BeamClient = require('beam-client-node');
 const BeamSocket = require('beam-client-node/lib/ws');
 const config = require('./config');
+const firebase = require('firebase'); // <- is this necessary with firebase-admin?
+const admin = require('firebase-admin');
+var serviceAccount = require('./effbot-key.json');
 
 const botToken = config.token;
 const username = config.username;
@@ -8,6 +11,14 @@ const username = config.username;
 let userInfo;
 let targetChannelId;
 var botActive = true;
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: config.firebaseURL
+})
+
+var db = admin.database();
+var ref = db.ref('/users');
 
 const client = new BeamClient();
 
@@ -47,8 +58,8 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
           if (data.message.message[0].data.toLowerCase().startsWith('!shutdown') && (data.user_name === 'EffingController') )
           {
             socket.call('msg', ['Shutting the Eff down!']);
+            clearInterval(autoMessage);
             botActive = false;
-            console.log(botActive);
           }
 
           if (data.message.message[0].data.toLowerCase().startsWith('!help')) {
@@ -58,6 +69,23 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
 
           if (data.message.message[0].data.toLowerCase().startsWith('!links')) {
             socket.call('whisper', [data.user_name, 'YOUTUBE: www.youtube.com/effingcontroller | TWITTER: @effingctrlr | PATREON: www.patreon.com/effingcontroller | STREAMJAR: streamjar.tv/tip/effingcontroller | YOU\'RE WELCOME.'])
+          }
+
+          if (data.message.message[0].data.toLowerCase().startsWith('!status')) {
+            var userRef = db.ref("users/" + data.user_name.toLowerCase());
+            userRef.on("value", function(snapshot){
+              if (snapshot.val() === null) {
+                console.log("!status command failed for " + data.user_name.toLowerCase() );
+                socket.call('whisper', [data.user_name, 'Sorry, it looks like you haven\'t enlisted yet. Type !enlist to join the Effing Navy!']);
+              }
+              else {
+                var userInfo = snapshot.val();
+                socket.call('whisper', [data.user_name, 'Your boat is called the ' + userInfo.boat + ", a " + userInfo.boatClass + " submarine. She's armed with " + userInfo.torpedoes + " torpedoes. You currently have " + userInfo.renown + " points of renown."]);
+                console.log(snapshot.key, "\n\n");
+                console.log(snapshot.ref.toString(), "\n\n");
+                console.log(snapshot.val());
+              }
+            })
           }
         }
       })
