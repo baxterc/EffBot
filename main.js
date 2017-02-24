@@ -3,7 +3,9 @@ const BeamSocket = require('beam-client-node/lib/ws');
 const config = require('./config');
 const firebase = require('firebase'); // <- is this necessary with firebase-admin?
 const admin = require('firebase-admin');
+const fs = require('fs');
 var serviceAccount = require('./effbot-key.json');
+var gameConfig = require('./game-config.json');
 
 const botToken = config.token;
 const username = config.username;
@@ -11,6 +13,7 @@ const username = config.username;
 let userInfo;
 let targetChannelId;
 var botActive = true;
+var subNumber = gameConfig.subNumber;
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -63,7 +66,6 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
           }
 
           if (data.message.message[0].data.toLowerCase().startsWith('!help')) {
-            console.log(data);
             socket.call('whisper', [data.user_name, "Here's a list of commands: !help, !links"])
           }
 
@@ -71,8 +73,51 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
             socket.call('whisper', [data.user_name, 'YOUTUBE: www.youtube.com/effingcontroller | TWITTER: @effingctrlr | PATREON: www.patreon.com/effingcontroller | STREAMJAR: streamjar.tv/tip/effingcontroller | YOU\'RE WELCOME.'])
           }
 
+          if (data.message.message[0].data.toLowerCase().startsWith('!enlist')) {
+            var userRef = db.ref("users/" + data.user_name.toLowerCase());
+            userRef.on("value", function(snapshot){
+              if (snapshot.val() === null) {
+                subNumber ++;
+                boatNum = "U-" + subNumber.toString();
+                userRef.set({
+                  "boat": boatNum,
+                  "boatClass": "Type II",
+                  "torpedoes": 5,
+                  "renown": 0
+                })
+                socket.call('whisper', [data.user_name, "Welcome aboard, captain!"]);
+                var shipNameObj = { "subNumber": subNumber};
+                fs.writeFile("./game-config.json", JSON.stringify(shipNameObj), (err) => {
+                  if (err) {
+                    console.error(err);
+                    return;
+                  };
+                  console.log("Sub number updated");
+                });
+              }
+              else {
+                socket.call('whisper', [data.user_name, 'You\'re already enlisted!']);
+              }
+            })
+          }
+
+          /* --- This is a test function to see if the sub number gets iterated and then saved to a JSON config file
+          if (data.message.message[0].data.toLowerCase().startsWith('!iterate')) {
+            subNumber ++;
+            console.log(subNumber);
+            var shipNameObj = { "subNumber": subNumber};
+            fs.writeFile("./game-config.json", JSON.stringify(shipNameObj), (err) => {
+              if (err) {
+                console.error(err);
+                return;
+              };
+              console.log("Sub number updated");
+            })
+          } */
+
           if (data.message.message[0].data.toLowerCase().startsWith('!status')) {
             var userRef = db.ref("users/" + data.user_name.toLowerCase());
+            //should this use child(data.user_name.toLowerCase()).once('value') ??
             userRef.on("value", function(snapshot){
               if (snapshot.val() === null) {
                 console.log("!status command failed for " + data.user_name.toLowerCase() );
