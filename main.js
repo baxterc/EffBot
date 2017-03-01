@@ -142,10 +142,65 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
               socket.call('whisper', [data.user_name, 'The game isn\'t running ya goober!']);
             }
 
+            else {
+              var userRef = db.ref("users/" + data.user_name.toLowerCase());
+              userRef.once("value", function(snapshot){
+
+                // userRef should be null if the player hasn't used the "!enlist" command.
+                if (snapshot.val() === null) {
+                  socket.call('whisper', [data.user_name, 'Sorry, it looks like you haven\'t enlisted yet. Type !enlist to join the Effing Navy!']);
+                }
+
+                else {
+                  if (shipSighted === false) {
+                    var playerSub = snapshot.val();
+                    //player has no torpedoes; no torpedo fired, but the player gets ridiculed.
+                    if(playerSub.torpedoes <= 0) {
+                      socket.call('msg', ['@' + data.user_name + ' is all out of torpedoes! What a dingus!']);
+                    }
+                    //game started, no ship in sight, but player has a torpedo; a torpedo is fired at nothing.
+                    else {
+                      console.log("fire triggered with no ship");
+                      socket.call('msg', ['@' + data.user_name + ' got excited and shot a torpedo too early! Don\'t worry, it happens to all of us.']);
+                      var torps = playerSub.torpedoes - 1;
+                      console.log(torps)
+                      userRef.set({
+                        "boat": playerSub.boat,
+                        "boatClass": playerSub.boatClass,
+                        "torpedoes": torps,
+                        "renown": playerSub.renown
+                      });
+                    }
+                  }
+
+                  else {
+                    var playerSub = snapshot.val();
+                    //player has no torpedoes; no torpedo fired, but the player gets ridiculed.
+                    if(playerSub.torpedoes <= 0) {
+                      socket.call('msg', ['@' + data.user_name + ' is all out of torpedoes! What a dingus!']);
+                    }
+                    //game is live, player is defined and has a torpedo, ship is in sight -- calculate whether a hit is registered
+                    else {
+                      console.log("fire triggered with ship sighted");
+                      var torps = playerSub.torpedoes - 1;
+                      console.log(torps)
+                      userRef.set({
+                        "boat": playerSub.boat,
+                        "boatClass": playerSub.boatClass,
+                        "torpedoes": torps,
+                        "renown": playerSub.renown
+                      });
+                      //for now, !fire will result in a hit and destruction of target
+                      shipDestroyed(data.user_name, activeShip.tonnage);
+                    }
+                  }
+                }
+              })
+            }
+/*
             // game started, but no ship in sight -- starts by checking the DB to see if the player is even registered for the game.
             if (gameState === true && shipSighted === false) {
               var userRef = db.ref("users/" + data.user_name.toLowerCase());
-              console.log(userRef);
               userRef.once("value", function(snapshot){
 
                 // userRef should be null if the player hasn't used the "!enlist" command.
@@ -178,6 +233,43 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
                 }
               })
             }
+            //game started and ship is in sight -- check to see if player is registered -- refactor so that this branches to the other logic checks
+            if (gameState === true && shipSighted === true) {
+              var userRef = db.ref("users/" + data.user_name.toLowerCase());
+              userRef.once("value", function(snapshot){
+
+                // userRef should be null if the player hasn't used the "!enlist" command.
+                if (snapshot.val() === null) {
+                  socket.call('whisper', [data.user_name, 'Sorry, it looks like you haven\'t enlisted yet. Type !enlist to join the Effing Navy!']);
+                }
+
+                // userRef should have a value if the player has enlisted. From here, check to see if a torpedo is subtracted...
+                else {
+                  var playerSub = snapshot.val();
+
+                  //player has no torpedoes; no torpedo fired, but the player gets ridiculed.
+                  if(playerSub.torpedoes <= 0) {
+                    socket.call('msg', ['@' + data.user_name + ' is all out of torpedoes! What a dingus!']);
+                  }
+
+                  //game is live, player is defined and has a torpedo, ship is in sight -- calculate whether a hit is registered
+                  else {
+                    console.log("fire triggered with ship sighted");
+                    var torps = playerSub.torpedoes - 1;
+                    console.log(torps)
+                    userRef.set({
+                      "boat": playerSub.boat,
+                      "boatClass": playerSub.boatClass,
+                      "torpedoes": torps,
+                      "renown": playerSub.renown
+                    });
+                    //for now, !fire will result in a hit and destruction of target
+                    shipDestroyed(data.user_name, activeShip.tonnage);
+                  }
+                }
+              })
+            }
+            */
           }
         }
       })
@@ -198,14 +290,13 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
     socket.call('msg', ['The patrol has begun! Destroy any enemy ships you encounter!']);
     var shipInterval = Math.floor(1+ (Math.random() * config.shipTime));
     console.log(shipInterval);
-    setTimeout(function(){createTarget()}, shipInterval);
-    //createTarget();
+    setTimeout(function(){createTarget()}, 5000);
   }
 
   function createTarget() {
     shipSighted = true;
     var shipSelect = Math.floor(Math.random() * 10);
-    console.log(shipSelect);
+    console.log('createTarget called');
     if (shipSelect <= 4) {
       shipTonnage = Math.floor(1000 + (Math.random() * 500));
       activeShip = { shipClass: 'Small Freighter', tonnage: shipTonnage }
@@ -227,8 +318,18 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
   }
 
   function shipDestroyed(username, renown) {
-    shipSighted = false;
-    activeShip = null;
-    socket.call('msg', ['Target destroyed! ' + username + " receives " + renown + " points of renown!"]);
+    var userRef = db.ref("users/" + username.toLowerCase());
+    userRef.once("value", function(snapshot){
+      var playerSub = snapshot.val()
+      shipSighted = false;
+      activeShip = null;
+      socket.call('msg', ['Target destroyed! ' + username + " receives " + renown + " points of renown!"]);
+      userRef.set({
+        "boat": playerSub.boat,
+        "boatClass": playerSub.boatClass,
+        "torpedoes": playerSub.torpedoes,
+        "renown": playerSub.renown + renown
+      });
+    })
   }
 }
