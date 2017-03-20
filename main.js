@@ -52,7 +52,7 @@ client.request('GET', 'users/current').then(response => {
 
 function createChatSocket(userId, channelId, endpoints, authkey) {
   const socket = new BeamSocket(endpoints).boot();
-      var autoMessage = setInterval(function(){ socket.call('msg', ['Howdy Folks! I am EffBot, EffingController\'s digital manservant! Type !help for a list of commands.']); }, (5*60*1000)); // this should only fire if the bot is actuve
+      var autoMessage = setInterval(function(){ socket.call('msg', ['Howdy Folks! I am EffBot, EffingController\'s digital manservant! Type !help for a list of commands.']); }, (5*60*1000)); // make this fire only if the bot is active.
       socket.on('ChatMessage', data => {
         if (botActive === true) {
           if (data.message.message[0].data.toLowerCase().startsWith('!shutdown') && (data.user_name === ownerName) )
@@ -63,7 +63,14 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
           }
 
           if (data.message.message[0].data.toLowerCase().startsWith('!help')) {
-            socket.call('whisper', [data.user_name, "Here's a list of commands: !help, !links, !addquote"])
+            if (data.message.message[0].data.length > 5) {
+              var helpString = data.message.message[0].data.slice(5).trim();
+              console.log(helpString);
+              resolveHelp(data.user_name, helpString);
+            }
+            else {
+              socket.call('whisper', [data.user_name, "Here's a list of commands. Use !help <command> for more info: !help, !links, !addquote"])
+            }
           }
 
           if (data.message.message[0].data.toLowerCase().startsWith('!links')) {
@@ -271,6 +278,23 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
       text: quote,
       user: username
     })
+  }
+
+
+  function resolveHelp(username, helpTopic) {
+    if (helpTopic === "!help") {
+      socket.call('whisper', [username, "!help provides a list of basic commands, and using !help <command> gives you info about that command. I hope you found this info about !help helpful."])
+    }
+    if (helpTopic === "!links") {
+      socket.call('whisper', [username, "Lists links to my various social media presences and so forth."])
+    }
+    if (helpTopic === "!addquote") {
+      socket.call('whisper', [username, "Adds the text directly after !addquote as a quote to the effing database."])
+    }
+    else {
+      socket.call('whisper', [username, "Sorry, I didn't understand what you need help with. Help me help you!"])
+    }
+
   }
 }
 
