@@ -8,7 +8,7 @@ var serviceAccount = require('./effbot-key.json');
 var gameConfig = require('./game-config.json');
 
 const botToken = config.token;
-const username = config.username;
+const ownerName = config.username;
 
 let userInfo;
 let targetChannelId;
@@ -24,7 +24,7 @@ admin.initializeApp({
 })
 
 var db = admin.database();
-var ref = db.ref('/users');
+//var ref = db.ref('/users');
 
 const client = new BeamClient();
 
@@ -36,17 +36,14 @@ client.use('oauth', {
 });
 
 client.request('GET', 'users/current').then(response => {
-  console.log(response.body);
   userInfo = response.body;
-  return client.request('GET', 'channels/' + username).then(response2 => {
+  return client.request('GET', 'channels/' + ownerName).then(response2 => {
     targetChannelId = response2.body.id;
     return client.chat.join(targetChannelId);
   })
 })
 .then(response => {
   const body = response.body;
-  console.log(body);
-  console.log(userInfo.channel.id);
   return createChatSocket(userInfo.id, targetChannelId, body.endpoints, body.authkey);
 })
 .catch(error => {
@@ -55,13 +52,10 @@ client.request('GET', 'users/current').then(response => {
 
 function createChatSocket(userId, channelId, endpoints, authkey) {
   const socket = new BeamSocket(endpoints).boot();
-
-      var autoMessage = setInterval(function(){ socket.call('msg', ['Howdy Folks! I am EffBot, EffingController\'s digital manservant! Type !help for a list of commands.']); }, (5*60*1000));
-
+      var autoMessage = setInterval(function(){ socket.call('msg', ['Howdy Folks! I am EffBot, EffingController\'s digital manservant! Type !help for a list of commands.']); }, (5*60*1000)); // this should only fire if the bot is actuve
       socket.on('ChatMessage', data => {
         if (botActive === true) {
-
-          if (data.message.message[0].data.toLowerCase().startsWith('!shutdown') && (data.user_name === 'EffingController') )
+          if (data.message.message[0].data.toLowerCase().startsWith('!shutdown') && (data.user_name === ownerName) )
           {
             socket.call('msg', ['Shutting the Eff down!']);
             clearInterval(autoMessage);
@@ -69,74 +63,41 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
           }
 
           if (data.message.message[0].data.toLowerCase().startsWith('!help')) {
-            socket.call('whisper', [data.user_name, "Here's a list of commands: !help, !links"])
+            socket.call('whisper', [data.user_name, "Here's a list of commands: !help, !links, !addquote"])
           }
 
           if (data.message.message[0].data.toLowerCase().startsWith('!links')) {
-            socket.call('whisper', [data.user_name, 'YOUTUBE: www.youtube.com/effingcontroller | TWITTER: @effingctrlr | PATREON: www.patreon.com/effingcontroller | STREAMJAR: streamjar.tv/tip/effingcontroller | YOU\'RE WELCOME.'])
+            socket.call('whisper', [data.user_name, 'YOUTUBE: www.youtube.com/effingcontroller | DISCORD: discord.gg/AnZkHTX | TWITTER: @effingctrlr | PATREON: www.patreon.com/effingcontroller | STREAMJAR: streamjar.tv/tip/effingcontroller | YOU\'RE WELCOME.'])
           }
 
           if (data.message.message[0].data.toLowerCase().startsWith('!enlist')) {
-            var userRef = db.ref("users/" + data.user_name.toLowerCase());
-            userRef.once("value", function(snapshot){
-              if (snapshot.val() === null) {
-                subNumber ++;
-                boatNum = "U-" + subNumber.toString();
-                userRef.set({
-                  "boat": boatNum,
-                  "boatClass": "Type II",
-                  "torpedoes": 5,
-                  "renown": 0
-                })
-                socket.call('whisper', [data.user_name, "Welcome aboard, captain!"]);
-                var shipNameObj = { "subNumber": subNumber};
-                fs.writeFile("./game-config.json", JSON.stringify(shipNameObj), (err) => {
-                  if (err) {
-                    console.error(err);
-                    return;
-                  };
-                  console.log("Sub number updated");
-                });
-              }
-              else {
-                socket.call('whisper', [data.user_name, 'You\'re already enlisted!']);
-              }
-            })
+            enlistUser(data.user_name);
           }
 
           if (data.message.message[0].data.toLowerCase().startsWith('!status')) {
-            var userRef = db.ref("users/" + data.user_name.toLowerCase());
-            //should this use child(data.user_name.toLowerCase()).once('value') ??
-            userRef.once("value", function(snapshot){
-              if (snapshot.val() === null) {
-                socket.call('whisper', [data.user_name, 'Sorry, it looks like you haven\'t enlisted yet. Type !enlist to join the Effing Navy!']);
-              }
-              else {
-                var userInfo = snapshot.val();
-                socket.call('whisper', [data.user_name, 'Your boat is called the ' + userInfo.boat + ", a " + userInfo.boatClass + " submarine. She's armed with " + userInfo.torpedoes + " torpedoes. You currently have " + userInfo.renown + " points of renown."]);
-                console.log(snapshot.key, "\n\n");
-                console.log(snapshot.ref.toString(), "\n\n");
-                console.log(snapshot.val());
-              }
-            })
+            getStatus(data.user_name);
           }
 
-
-          if (data.message.message[0].data.toLowerCase().startsWith('!startpatrol') && data.user_name === config.username && gameState === false) {
+          if (data.message.message[0].data.toLowerCase().startsWith('!startpatrol') && data.user_name === ownerName && gameState === false) {
             gameStart();
           }
 
-          if (data.message.message[0].data.toLowerCase().startsWith('!endpatrol') && data.user_name === config.username && gameState === true) {
+          if (data.message.message[0].data.toLowerCase().startsWith('!endpatrol') && data.user_name === ownerName && gameState === true) {
             gameState = false;
             console.log("Game ended!");
           }
 
-          if (data.message.message[0].data.toLowerCase().startsWith('!spawn') && data.user_name === config.username && gameState === true) {
+          if (data.message.message[0].data.toLowerCase().startsWith('!spawn') && data.user_name === ownerName && gameState === true) {
             createTarget();
           }
 
           if (data.message.message[0].data.toLowerCase().startsWith('!fire')){
             resolveShot(data.user_name);
+          }
+          if (data.message.message[0].data.toLowerCase().startsWith('!addquote')){
+            var quoteString = (data.message.message[0].data).slice(9);
+            var username = data.user_name;
+            saveQuote(username, quoteString.trim());
           }
         }
       })
@@ -148,8 +109,48 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
 
   return socket.auth(channelId, userId, authkey)
   .then(() => {
-    console.log('Authentication successful.');
+    console.log('Authentication successful. EffBot is online!');
   });
+
+  function getStatus(username) {
+    var userRef = db.ref("users/" + username.toLowerCase());
+    userRef.once("value", function(snapshot){
+      if (snapshot.val() === null) {
+        socket.call('whisper', [username, 'Sorry, it looks like you haven\'t enlisted yet. Type !enlist to join the Effing Navy!']);
+      }
+      else {
+        var userInfo = snapshot.val();
+        socket.call('whisper', [username, 'Your boat is called the ' + userInfo.boat + ", a " + userInfo.boatClass + " submarine. She's armed with " + userInfo.torpedoes + " torpedoes. You currently have " + userInfo.renown + " points of renown."]);
+      }
+    })
+  }
+
+  function enlistUser(username) {
+    var userRef = db.ref("users/" + username.toLowerCase());
+    userRef.once("value", function(snapshot){
+      if (snapshot.val() === null) {
+        subNumber ++;
+        boatNum = "U-" + subNumber.toString();
+        userRef.set({
+          "boat": boatNum,
+          "boatClass": "Type II",
+          "torpedoes": 5,
+          "renown": 0
+        })
+        socket.call('whisper', [username, "Welcome aboard, captain!"]);
+        var shipNameObj = { "subNumber": subNumber};
+        fs.writeFile("./game-config.json", JSON.stringify(shipNameObj), (err) => {
+          if (err) {
+            console.error(err);
+            return;
+          };
+        });
+      }
+      else {
+        socket.call('whisper', [username, 'You\'re already enlisted!']);
+      }
+    })
+  }
 
   function gameStart() {
     console.log("Game started!");
@@ -157,7 +158,7 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
     socket.call('msg', ['The patrol has begun! Destroy any enemy ships you encounter!']);
     var shipInterval = Math.floor(1+ (Math.random() * config.shipTime));
     console.log(shipInterval);
-    setTimeout(function(){createTarget()}, 5000);
+    setTimeout(function(){createTarget()}, (shipInterval * 60 * 1000));
   }
 
   function createTarget() {
@@ -219,18 +220,24 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
             }
             // ship has been spawned
             else {
-              //game is live, player is defined and has a torpedo, ship is in sight -- calculate whether a hit is registered
+              var shotHit = Math.floor((Math.random() * 4));
               console.log("fire triggered with ship sighted");
-              var torps = playerSub.torpedoes - 1;
-              console.log(torps)
-              userRef.set({
-                "boat": playerSub.boat,
-                "boatClass": playerSub.boatClass,
-                "torpedoes": torps,
-                "renown": playerSub.renown
-              });
-              //for now, !fire will result in a hit and destruction of target
-              shipDestroyed(username, activeShip.tonnage);
+              //player misses; 25% chance of a miss, basically
+              if (shotHit < 1) {
+                var torps = playerSub.torpedoes - 1;
+                console.log(torps)
+                socket.call('msg', [username + " missed!"]);
+                userRef.set({
+                  "boat": playerSub.boat,
+                  "boatClass": playerSub.boatClass,
+                  "torpedoes": torps,
+                  "renown": playerSub.renown
+                });
+              }
+              //hit registered
+              else {
+                shipDestroyed(username, activeShip.tonnage);
+              }
             }
           }
         }
@@ -242,15 +249,27 @@ function createChatSocket(userId, channelId, endpoints, authkey) {
     var userRef = db.ref("users/" + username.toLowerCase());
     userRef.once("value", function(snapshot){
       var playerSub = snapshot.val()
+      var torps = playerSub.torpedoes - 1;
       shipSighted = false;
       activeShip = null;
-      socket.call('msg', ['Target destroyed! ' + username + " receives " + renown + " points of renown!"]);
+      socket.call('msg', ['Target destroyed! @' + username + " receives " + renown + " points of renown!"]);
       userRef.set({
         "boat": playerSub.boat,
         "boatClass": playerSub.boatClass,
-        "torpedoes": playerSub.torpedoes,
+        "torpedoes": torps,
         "renown": playerSub.renown + renown
       });
+      var shipInterval = Math.floor(1+ (Math.random() * config.shipTime));
+      console.log(shipInterval);
+      setTimeout(function(){createTarget()}, (shipInterval * 60 * 1000));
+    })
+  }
+
+  function saveQuote(username, quote) {
+    var quoteRef = db.ref("quotes/");
+    quoteRef.push({
+      text: quote,
+      user: username
     })
   }
 }
